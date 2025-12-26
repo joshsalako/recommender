@@ -124,7 +124,7 @@ Settings such as paths and hyperparameters can be modified in `recommender_syste
 
 The project includes a Streamlit web application (`recommender_system/app.py`) for interactive movie recommendations:
 
-1. **Prerequisite**: Train a model first using `uv run python -m recommender_system.main --train`
+1. **Prerequisite**: Train a model first using `uv run python -m recommender_system.main --train` (skip this step to use an already trained model)
 2. **Run the app**: `uv run streamlit run recommender_system/app.py`
 3. **Features**:
    - Rate movies to get personalized recommendations
