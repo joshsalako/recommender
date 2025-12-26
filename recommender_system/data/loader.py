@@ -1,8 +1,7 @@
 import os
 import zipfile
-import subprocess
+import urllib.request
 import polars as pl
-import numpy as np
 from .. import config
 
 def download_and_extract_data():
@@ -15,10 +14,12 @@ def download_and_extract_data():
     # Check if ML-32M is extracted
     ml_32m_path = os.path.join(config.DATA_DIR, "ml-32m")
     if not os.path.exists(ml_32m_path):
-        print(f"Downloading ML-32M from {config.ML_32M_URL}...")
-        subprocess.run(["wget", config.ML_32M_URL, "-P", config.DATA_DIR], check=True)
+        zip_path = os.path.join(config.DATA_DIR, "ml-32m.zip")
+        if not os.path.exists(zip_path):
+            print(f"Downloading ML-32M from {config.ML_32M_URL}...")
+            urllib.request.urlretrieve(config.ML_32M_URL, zip_path)
         print("Extracting ML-32M...")
-        with zipfile.ZipFile(os.path.join(config.DATA_DIR, "ml-32m.zip"), 'r') as zip_ref:
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
             zip_ref.extractall(config.DATA_DIR)
     else:
         print(f"ML-32M dataset found at {ml_32m_path}")
@@ -26,10 +27,12 @@ def download_and_extract_data():
     # Check if ML-Latest-Small is extracted
     ml_small_path = os.path.join(config.DATA_DIR, "ml-latest-small")
     if not os.path.exists(ml_small_path):
-        print(f"Downloading ML-Latest-Small from {config.ML_LATEST_SMALL_URL}...")
-        subprocess.run(["wget", config.ML_LATEST_SMALL_URL, "-P", config.DATA_DIR], check=True)
+        zip_path = os.path.join(config.DATA_DIR, "ml-latest-small.zip")
+        if not os.path.exists(zip_path):
+            print(f"Downloading ML-Latest-Small from {config.ML_LATEST_SMALL_URL}...")
+            urllib.request.urlretrieve(config.ML_LATEST_SMALL_URL, zip_path)
         print("Extracting ML-Latest-Small...")
-        with zipfile.ZipFile(os.path.join(config.DATA_DIR, "ml-latest-small.zip"), 'r') as zip_ref:
+        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
             zip_ref.extractall(config.DATA_DIR)
     else:
         print(f"ML-Latest-Small dataset found at {ml_small_path}")
