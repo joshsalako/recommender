@@ -30,14 +30,11 @@ st.markdown("""
         margin-bottom: 20px;
     }
     /* Ensure consistent poster image sizing */
-    div[data-testid="stImage"] img,
-    div[data-testid="stImage"] > div > img,
-    .stImage img {
+    [data-testid="stImage"] img {
         width: 100% !important;
         height: 400px !important;
         object-fit: cover !important;
-        object-position: center !important;
-        border-radius: 8px;
+        border-radius: 8px !important;
     }
     /* Center the title */
     h1[data-testid="stMarkdownContainer"] {
