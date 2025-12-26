@@ -10,6 +10,7 @@ recommender/
 ├── uv.lock                 # Locked dependencies
 ├── recommender.ipynb       # Original Jupyter Notebook (Reference)
 ├── recommender_system/     # Main package
+│   ├── app.py              # Streamlit web application for interactive recommendations
 │   ├── data/               # Data loading and processing
 │   │   ├── loader.py       # Data download and loading
 │   │   └── index.py        # Efficient data indexing (CSR format)
@@ -18,6 +19,7 @@ recommender/
 │   │   ├── als_biases.py   # Bias-only model
 │   │   └── als_latent.py   # Basic matrix factorization
 │   ├── utils/              # Shared utilities
+│   │   ├── dummy_user.py   # Functions for new user recommendations
 │   │   └── numba_ops.py    # Numba-accelerated operations
 │   └── visualization/      # Visualization modules
 │       ├── plots.py        # General plotting functions
@@ -89,13 +91,20 @@ Visualizes movie latent vectors using PCA (requires trained model).
 uv run python -m recommender_system.main --vectors
 ```
 
+**Run Streamlit Web Application:**
+Interactive web interface for movie recommendations (requires trained model).
+```bash
+uv run streamlit run recommender_system/app.py
+```
+
 ## Key Features
 
 - **Scalable**: Handles MovieLens 32M (~32 million ratings)
 - **Fast**: Core operations accelerated with Numba JIT compilation
 - **Parallel**: Uses parallel processing for ALS updates
 - **Modular**: Clean separation of data, model, and visualization concerns
-- **Analysis**: comprehensive visualization of dataset statistics and model performance
+- **Analysis**: Comprehensive visualization of dataset statistics and model performance
+- **Interactive**: Streamlit web interface for real-time recommendations
 
 ## Models
 
@@ -110,3 +119,16 @@ uv run python -m recommender_system.main --vectors
 ## Configuration
 
 Settings such as paths and hyperparameters can be modified in `recommender_system/config.py`.
+
+## Web Interface
+
+The project includes a Streamlit web application (`recommender_system/app.py`) for interactive movie recommendations:
+
+1. **Prerequisite**: Train a model first using `uv run python -m recommender_system.main --train`
+2. **Run the app**: `uv run streamlit run recommender_system/app.py`
+3. **Features**:
+   - Rate movies to get personalized recommendations
+   - Adjust alpha parameter to control bias weighting
+   - View top recommendations with movie details
+
+The app automatically downloads the MovieLens dataset if needed and loads the trained model from `model.pkl`.

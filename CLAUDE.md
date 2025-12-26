@@ -17,6 +17,7 @@ recommender/
 ├── recommender.ipynb       # Original Jupyter Notebook (Reference)
 ├── recommender_system/     # Main package (refactored code)
 │   ├── __init__.py
+│   ├── app.py              # Streamlit web application for interactive recommendations
 │   ├── config.py           # Configuration settings
 │   ├── main.py             # Main pipeline script
 │   ├── data/               # Data loading and processing
@@ -30,6 +31,7 @@ recommender/
 │   │   └── als_latent.py   # Full matrix factorization
 │   ├── utils/              # Utility functions
 │   │   ├── __init__.py
+│   │   ├── dummy_user.py   # Functions for new user recommendations
 │   │   └── numba_ops.py    # Numba-accelerated operations
 │   └── visualization/      # Visualization modules
 │       ├── __init__.py
@@ -68,6 +70,11 @@ uv run python <script.py>
 uv run python -m recommender_system.main
 ```
 
+**Run the Streamlit web application:**
+```bash
+uv run streamlit run recommender_system/app.py
+```
+
 ### Running the Pipeline
 
 **Full pipeline (download data, visualization, grid search, training):**
@@ -91,6 +98,7 @@ uv run python -m recommender_system.main --train
 - **Machine learning**: scikit-learn
 - **Visualization**: matplotlib, seaborn, adjustText, wordcloud
 - **Parallel processing**: joblib
+- **Web interface**: streamlit
 
 All dependencies are managed by `uv` and specified in `pyproject.toml`.
 
@@ -137,6 +145,24 @@ Grid search over:
 
 Results are saved to CSV files for analysis.
 
+## Streamlit Web Application
+
+The project includes a Streamlit web interface for interactive movie recommendations:
+
+**Features:**
+- Interactive movie rating interface
+- Real-time personalized recommendations based on user ratings
+- Alpha parameter tuning for bias weighting in recommendations
+- Model loading from saved checkpoints (`model.pkl`)
+- Integration with the trained ALS model for inference
+
+**Usage:**
+1. First train a model using the main pipeline: `uv run python -m recommender_system.main --train`
+2. Run the Streamlit app: `uv run streamlit run recommender_system/app.py`
+3. The app will automatically download data if needed and load the trained model
+
+**Note:** The app requires a trained model checkpoint (`model.pkl`) in the project root. If not found, it will display instructions for training a model.
+
 ## Important Notes
 
 1. **Data paths**: The script downloads MovieLens dataset to `data_files/` directory.
@@ -144,6 +170,7 @@ Results are saved to CSV files for analysis.
 3. **Checkpointing**: Models are saved as pickle files with timestamped names containing hyperparameters.
 4. **Visualization**: All plots are saved as PDF files to the `results/` directory.
 5. **Package management**: Use `uv` commands instead of `pip` for all package operations.
+6. **Streamlit model requirement**: The web app requires a trained model checkpoint (`model.pkl`) in the project root.
 
 ## Model Loading and Inference
 
