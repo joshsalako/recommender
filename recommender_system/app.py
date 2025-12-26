@@ -29,6 +29,26 @@ st.markdown("""
     .movie-card {
         margin-bottom: 20px;
     }
+    /* Ensure consistent poster image sizing */
+    div[data-testid="stImage"] img,
+    div[data-testid="stImage"] > div > img,
+    .stImage img {
+        width: 100% !important;
+        height: 400px !important;
+        object-fit: cover !important;
+        object-position: center !important;
+        border-radius: 8px;
+    }
+    /* Center the title */
+    h1[data-testid="stMarkdownContainer"] {
+        text-align: center;
+    }
+    /* Center buttons */
+    .centered-button {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -90,8 +110,8 @@ if st.sidebar.button("Clear All Ratings"):
     st.session_state.user_ratings = {}
     st.rerun()
 
-st.title("🎬 Movie Recommender System")
-st.markdown("Rate some movies to get personalized recommendations!")
+st.markdown("<h1 style='text-align: center;'>🎬 Movie Recommender System</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;'>Rate some movies to get personalized recommendations!</p>", unsafe_allow_html=True)
 
 # User Ratings Input
 if 'user_ratings' not in st.session_state:
@@ -142,58 +162,66 @@ if st.session_state.user_ratings:
 
     st.divider()
 
-    # Get Recommendations
-    if st.button("✨ Get Recommendations", type="primary", use_container_width=True):
-        with st.spinner("Generating personalized recommendations..."):
-            dummy_ratings = []
-            for title, (mid, score) in st.session_state.user_ratings.items():
-                if mid in movie_index.movie_to_idx:
-                    idx = movie_index.movie_to_idx[mid]
-                    dummy_ratings.append((idx, score))
+    # Get Recommendations - centered button
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        if st.button("✨ Get Recommendations", type="primary", use_container_width=True):
+            # Generate recommendations and store in session state
+            with st.spinner("Generating personalized recommendations..."):
+                dummy_ratings = []
+                for title, (mid, score) in st.session_state.user_ratings.items():
+                    if mid in movie_index.movie_to_idx:
+                        idx = movie_index.movie_to_idx[mid]
+                        dummy_ratings.append((idx, score))
 
-            if not dummy_ratings:
-                st.warning("None of the rated movies are in the model's index.")
-            else:
-                user_bias, user_vector = get_dummy_user_factors(model, dummy_ratings)
-                rated_indices = [r[0] for r in dummy_ratings]
+                if not dummy_ratings:
+                    st.warning("None of the rated movies are in the model's index.")
+                    st.session_state.recommendations = None
+                else:
+                    user_bias, user_vector = get_dummy_user_factors(model, dummy_ratings)
+                    rated_indices = [r[0] for r in dummy_ratings]
 
-                recommendations = recommend_for_dummy_user(
-                    model,
-                    train_movie,
-                    user_bias,
-                    user_vector,
-                    rated_items=rated_indices,
-                    top_n=15,
-                    alpha=alpha,
-                    min_item_ratings=100
-                )
+                    recommendations = recommend_for_dummy_user(
+                        model,
+                        train_movie,
+                        user_bias,
+                        user_vector,
+                        rated_items=rated_indices,
+                        top_n=15,
+                        alpha=alpha,
+                        min_item_ratings=100
+                    )
+                    st.session_state.recommendations = recommendations
+                    st.rerun()
 
-                st.subheader("Recommended for You")
+    # Display recommendations at full width (outside column constraint)
+    if 'recommendations' in st.session_state and st.session_state.recommendations is not None:
+        st.subheader("Recommended for You")
 
-                # Grid View Implementation
-                rec_cols = st.columns(3)
+        # Grid View Implementation
+        rec_cols = st.columns(4)
 
-                for idx, (item_idx, score) in enumerate(recommendations):
-                    col = rec_cols[idx % 3]
+        for idx, (item_idx, score) in enumerate(st.session_state.recommendations):
+            col = rec_cols[idx % 4]
 
-                    with col:
-                        if item_idx in movie_index.idx_to_movie:
-                            original_id = movie_index.idx_to_movie[item_idx]
-                            rec_movie_row = movies_df.filter(pl.col("movieId") == original_id)
+            with col:
+                if item_idx in movie_index.idx_to_movie:
+                    original_id = movie_index.idx_to_movie[item_idx]
+                    rec_movie_row = movies_df.filter(pl.col("movieId") == original_id)
 
-                            if not rec_movie_row.is_empty():
-                                title = rec_movie_row['title'][0]
-                                genres = rec_movie_row['genres'][0]
+                    if not rec_movie_row.is_empty():
+                        title = rec_movie_row['title'][0]
+                        genres = rec_movie_row['genres'][0]
 
-                                # Fetch Poster
-                                poster_url = poster_fetcher.get_poster_url(original_id, title)
+                        # Fetch Poster
+                        poster_url = poster_fetcher.get_poster_url(original_id, title)
 
-                                st.image(poster_url, use_column_width=True)
-                                st.markdown(f"**{title}**")
-                                st.caption(f"_{genres}_")
-                                # Score hidden as requested
-                                # st.caption(f"Score: {score:.2f}")
-                                st.markdown("---")
+                        st.image(poster_url, width='stretch')
+                        st.markdown(f"**{title}**")
+                        st.caption(f"_{genres}_")
+                        # Score hidden as requested
+                        # st.caption(f"Score: {score:.2f}")
+                        st.markdown("---")
 
 else:
     st.info("Start by searching and rating a few movies above to see recommendations!")
