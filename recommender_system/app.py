@@ -187,7 +187,7 @@ if st.session_state.user_ratings:
                         user_bias,
                         user_vector,
                         rated_items=rated_indices,
-                        top_n=15,
+                        top_n=20,
                         alpha=alpha,
                         min_item_ratings=100
                     )
@@ -218,10 +218,11 @@ if st.session_state.user_ratings:
 
                         st.image(poster_url, width='stretch')
                         st.markdown(f"**{title}**")
-                        st.caption(f"_{genres}_")
+                        # st.caption(f"_{genres}_")
                         # Score hidden as requested
                         # st.caption(f"Score: {score:.2f}")
-                        st.markdown("---")
+                        # st.markdown("---")
+                        st.markdown("\n")
 
 else:
     st.info("Start by searching and rating a few movies above to see recommendations!")
