@@ -25,3 +25,7 @@ N_EPOCHS = 20
 
 # Model Paths
 RESULTS_CSV_PATH = os.path.join(SAVE_DIR, "grid_search_results.csv")
+
+# Model Selection
+MODEL_CHOICES = ["als", "biases", "latent"]
+DEFAULT_MODEL = "als"

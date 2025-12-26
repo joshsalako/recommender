@@ -1,4 +1,7 @@
 import numpy as np
+import os
+import pickle
+import time
 
 class ALSLatent:
     def __init__(self, train_user, test_user, train_movie,
@@ -39,7 +42,7 @@ class ALSLatent:
                 prediction = self.predict(user_idx, item_idx)
                 sse += (true_rating - prediction) ** 2
                 count += 1
-        return np.sqrt(sse / count)
+        return np.sqrt(sse / count) if count > 0 else 0.0
 
     def _calculate_loss(self):
         sse = 0
@@ -55,11 +58,16 @@ class ALSLatent:
                                       )
         return self.lambda_reg * sse + reg_term
 
-    def train(self, n_epochs=10):
+    def train(self, n_epochs=10, save_dir="", prefix="ALSLatent"):
+        if save_dir:
+            os.makedirs(save_dir, exist_ok=True)
+
         print(f"\nStarting training for {n_epochs} epochs...")
         print(f"Hyperparameters: lambda={self.lambda_reg}, mu={self.mu:.4f}, tau={self.tau:.4f}")
 
-        for epoch in range(n_epochs):
+        start_epoch = len(self.train_loss_history)
+
+        for epoch in range(start_epoch, start_epoch + n_epochs):
             for m in range(self.n_users):
                 # Update user bias
                 residuals_sum = sum(r - self.mu - self.item_biases[i] -
@@ -116,7 +124,119 @@ class ALSLatent:
             self.train_rmse_history.append(train_rmse)
             self.test_rmse_history.append(test_rmse)
 
-            print(f"Epoch {epoch+1}/{n_epochs} | "
+            print(f"Epoch {epoch+1}/{start_epoch + n_epochs} | "
                   f"Loss: {train_loss:.2f} | "
                   f"Train RMSE: {train_rmse:.4f} | "
                   f"Test RMSE: {test_rmse:.4f}")
+
+            if save_dir and ((epoch + 1) % 5 == 0 or epoch == start_epoch + n_epochs - 1):
+                timestamp = time.strftime("%Y%m%d-%H%M%S")
+                self._save_checkpoint(save_dir, prefix, epoch, timestamp)
+
+    def evaluate(self, k=10, threshold=3.5, n_eval_users=3000):
+        """
+        Evaluate the model using Top-K metrics (Precision and Recall).
+        """
+        precision_sum = 0.0
+        recall_sum = 0.0
+        valid_user_count = 0
+
+        if n_eval_users is not None and n_eval_users < self.n_users:
+            rng = np.random.default_rng(42)
+            target_users = rng.choice(self.n_users, size=n_eval_users, replace=False).astype(np.int32)
+        else:
+            target_users = np.arange(self.n_users, dtype=np.int32)
+
+        for u in target_users:
+            # Ground Truth
+            # Check test_user ragged array
+            if len(self.test_user[u]) == 0:
+                continue
+
+            relevant_items = {int(item) for item, rating in self.test_user[u] if rating >= threshold}
+            if not relevant_items:
+                continue
+
+            n_relevant = len(relevant_items)
+
+            # Predict scores for all items
+            # Optim: Vectorized prediction for all items for a single user
+            # score = mu + user_bias + item_biases + user_vec . item_vecs
+            scores = (self.mu + self.user_biases[u] + self.item_biases +
+                      self.item_vector.dot(self.user_vector[u]))
+
+            # Mask training items
+            train_items = {int(item) for item, _ in self.train_user[u]}
+            scores[list(train_items)] = -np.inf
+
+            # Top-K
+            top_k_indices = np.argsort(scores)[::-1][:k]
+
+            # Hits
+            hits = sum(1 for item in top_k_indices if item in relevant_items)
+
+            precision_sum += hits / k
+            recall_sum += hits / n_relevant
+            valid_user_count += 1
+
+        precision = precision_sum / valid_user_count if valid_user_count > 0 else 0.0
+        recall = recall_sum / valid_user_count if valid_user_count > 0 else 0.0
+
+        print(f"Precision@{k}: {precision:.4f} | Recall@{k}: {recall:.4f}")
+        return precision, recall
+
+    def _save_checkpoint(self, save_dir, prefix, epoch, timestamp):
+        filename = (
+            f"{prefix}_epoch={epoch+1}_k={self.k}_lambda={self.lambda_reg}"
+            f"_tau={self.tau}_{self.mu:.4f}_{timestamp}.pkl"
+        )
+        filepath = os.path.join(save_dir, filename)
+
+        checkpoint = {
+            "epoch": epoch + 1,
+            "k": self.k,
+            "tau": self.tau,
+            "lambda_reg": self.lambda_reg,
+            "mu": self.mu,
+            "user_biases": self.user_biases,
+            "item_biases": self.item_biases,
+            "user_vector": self.user_vector,
+            "item_vector": self.item_vector,
+            "train_loss_history": self.train_loss_history.copy(),
+            "train_rmse_history": self.train_rmse_history.copy(),
+            "test_rmse_history": self.test_rmse_history.copy(),
+            "n_users": self.n_users,
+            "n_movies": self.n_movies,
+        }
+        with open(filepath, "wb") as f:
+            pickle.dump(checkpoint, f, protocol=pickle.HIGHEST_PROTOCOL)
+
+        print(f"Saved model checkpoint -> {filepath}\n")
+
+    @classmethod
+    def load_checkpoint(cls, train_user, test_user, train_movie, test_movie, path, n_jobs=1):
+        with open(path, "rb") as f:
+            ckpt = pickle.load(f)
+
+        model = cls(
+            n_users=ckpt["n_users"],
+            n_movies=ckpt["n_movies"],
+            k=ckpt["k"],
+            lambda_reg=ckpt["lambda_reg"],
+            tau=ckpt["tau"],
+            train_user=train_user,
+            test_user=test_user,
+            train_movie=train_movie,
+            test_movie=test_movie,
+        )
+
+        model.mu = ckpt["mu"]
+        model.user_biases = ckpt["user_biases"]
+        model.item_biases = ckpt["item_biases"]
+        model.user_vector = ckpt["user_vector"]
+        model.item_vector = ckpt["item_vector"]
+        model.train_loss_history = ckpt.get("train_loss_history", [])
+        model.train_rmse_history = ckpt.get("train_rmse_history", [])
+        model.test_rmse_history = ckpt.get("test_rmse_history", [])
+
+        return model

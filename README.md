@@ -68,9 +68,19 @@ uv run python -m recommender_system.main --visualize
 ```
 
 **Train Model:**
-Runs grid search for hyperparameters and trains the optimized ALS model.
+Runs grid search for hyperparameters and trains the model.
+You can specify the model type using the `--model` argument (default: `als`).
+Available options: `als`, `biases`, `latent`.
+
 ```bash
+# Train default optimized ALS model
 uv run python -m recommender_system.main --train
+
+# Train bias-only model
+uv run python -m recommender_system.main --train --model biases
+
+# Train basic latent factor model
+uv run python -m recommender_system.main --train --model latent
 ```
 
 **Visualize Vectors:**
