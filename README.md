@@ -8,6 +8,7 @@ A high-performance recommender system implementing Alternating Least Squares (AL
 recommender/
 ├── pyproject.toml          # Project configuration and dependencies (uv)
 ├── uv.lock                 # Locked dependencies
+├── .env.samaple            # Sample environment variable
 ├── recommender.ipynb       # Original Jupyter Notebook (Reference)
 ├── recommender_system/     # Main package
 │   ├── app.py              # Streamlit web application for interactive recommendations
@@ -125,8 +126,9 @@ Settings such as paths and hyperparameters can be modified in `recommender_syste
 The project includes a Streamlit web application (`recommender_system/app.py`) for interactive movie recommendations:
 
 1. **Prerequisite**: Train a model first using `uv run python -m recommender_system.main --train` (skip this step to use an already trained model)
-2. **Run the app**: `uv run streamlit run recommender_system/app.py`
-3. **Features**:
+2. Create an environment variable from `.env.sample` with your `TMDB_API_KEY`
+3. **Run the app**: `uv run streamlit run recommender_system/app.py`
+4. **Features**:
    - Rate movies to get personalized recommendations
    - Adjust alpha parameter to control bias weighting
    - View top recommendations with movie details
