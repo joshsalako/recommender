@@ -2,6 +2,8 @@
 
 A high-performance recommender system implementing Alternating Least Squares (ALS) matrix factorization for the MovieLens 32M dataset. Optimized with Numba acceleration and parallel processing.
 
+**Live Demo**: [https://als-recommender.streamlit.app/](https://als-recommender.streamlit.app/)
+
 ## Project Structure
 
 ```
