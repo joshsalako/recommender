@@ -177,6 +177,86 @@ class ALS:
 
         print(f"Saved model checkpoint -> {filepath}\n")
 
+    def save_for_inference(self, output_dir="inference"):
+        """
+        Save model parameters in a lightweight format optimized for inference.
+
+        Creates files:
+        - app_model.npz: Compressed model parameters
+        - app_index.pkl: ID mappings (to be combined with LightweightMovieIndex)
+        - app_item_counts.npy: Item rating counts (to be combined with LightweightMovieIndex)
+        """
+        import os
+        import numpy as np
+
+        # Create output directory
+        os.makedirs(output_dir, exist_ok=True)
+
+        # Save model parameters in compressed format
+        model_path = os.path.join(output_dir, "app_model.npz")
+        np.savez_compressed(
+            model_path,
+            mu=self.mu,
+            user_biases=self.user_biases,
+            item_biases=self.item_biases,
+            user_vector=self.user_vector,
+            item_vector=self.item_vector,
+            k=self.k,
+            lambda_reg=self.lambda_reg,
+            tau=self.tau,
+            n_users=self.n_users,
+            n_movies=self.n_movies
+        )
+
+        print(f"Saved inference model -> {model_path}")
+
+        return model_path
+
+    @classmethod
+    def load_for_inference(cls, model_path, n_jobs=1):
+        """
+        Load model for inference-only use.
+
+        Args:
+            model_path: Path to app_model.npz file
+            n_jobs: Number of parallel jobs (unused in inference mode)
+
+        Returns:
+            ALS model instance with only inference capabilities
+        """
+        import numpy as np
+
+        # Load compressed model data
+        model_data = np.load(model_path, mmap_mode='r')
+
+        # Create model with minimal initialization
+        model = cls(
+            n_users=int(model_data['n_users']),
+            n_movies=int(model_data['n_movies']),
+            k=int(model_data['k']),
+            lambda_reg=float(model_data['lambda_reg']),
+            tau=float(model_data['tau']),
+            train_user=None,
+            test_user=None,
+            train_movie=None,
+            test_movie=None,
+            n_jobs=n_jobs
+        )
+
+        # Load model parameters
+        model.mu = float(model_data['mu'])
+        model.user_biases = model_data['user_biases'].astype(np.float32)
+        model.item_biases = model_data['item_biases'].astype(np.float32)
+        model.user_vector = model_data['user_vector'].astype(np.float32)
+        model.item_vector = model_data['item_vector'].astype(np.float32)
+
+        # Clear training history (not needed for inference)
+        model.train_loss_history = []
+        model.train_rmse_history = []
+        model.test_rmse_history = []
+
+        return model
+
     @classmethod
     def load_checkpoint(cls, train_user, test_user, train_movie, test_movie, path, n_jobs=1):
         with open(path, "rb") as f:

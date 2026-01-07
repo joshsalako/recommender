@@ -10,24 +10,34 @@ recommender/
 ├── uv.lock                 # Locked dependencies
 ├── .env.samaple            # Sample environment variable
 ├── recommender.ipynb       # Original Jupyter Notebook (Reference)
+├── convert_model.py        # Convert trained models to lightweight inference format
 ├── recommender_system/     # Main package
+│   ├── __init__.py
 │   ├── app.py              # Streamlit web application for interactive recommendations
+│   ├── config.py           # Configuration settings
+│   ├── main.py             # Main pipeline script
 │   ├── data/               # Data loading and processing
+│   │   ├── __init__.py
 │   │   ├── loader.py       # Data download and loading
 │   │   └── index.py        # Efficient data indexing (CSR format)
 │   ├── models/             # ALS implementations
+│   │   ├── __init__.py
 │   │   ├── als.py          # Optimized ALS model
 │   │   ├── als_biases.py   # Bias-only model
 │   │   └── als_latent.py   # Basic matrix factorization
 │   ├── utils/              # Shared utilities
+│   │   ├── __init__.py
 │   │   ├── dummy_user.py   # Functions for new user recommendations
-│   │   └── numba_ops.py    # Numba-accelerated operations
+│   │   ├── numba_ops.py    # Numba-accelerated operations
+│   │   └── posters.py      # TMDB poster fetching
 │   └── visualization/      # Visualization modules
+│       ├── __init__.py
 │       ├── plots.py        # General plotting functions
 │       └── vectors.py      # Latent vector visualization
 ├── data_files/             # Downloaded datasets (runtime)
 ├── results/                # Generated plots and models
-└── main.py                 # Entry point script
+├── inference/              # Lightweight inference files (generated)
+└── .devcontainer/          # Development container configuration
 ```
 
 ## Note on Jupyter Notebook
@@ -45,6 +55,12 @@ This project uses [uv](https://github.com/astral-sh/uv) for fast and reliable pa
 2. **Sync dependencies**:
    ```bash
    uv sync
+   ```
+
+3. **Set up TMDB API key**:
+   ```bash
+   cp .env.sample .env
+   # Edit .env and add your TMDB API key from https://www.themoviedb.org/settings/api
    ```
 
 ## Usage
@@ -133,4 +149,9 @@ The project includes a Streamlit web application (`recommender_system/app.py`) f
    - Adjust alpha parameter to control bias weighting
    - View top recommendations with movie details
 
-The app automatically downloads the MovieLens dataset if needed and loads the trained model from `model.pkl`.
+### Model Loading Options
+The app supports two loading modes:
+1. **Standard Loading**: Loads full `model.pkl` (slower startup)
+2. **Memory-Efficient Loading**: Uses lightweight inference files from `inference/` directory (faster startup, requires running `convert_model.py` first)
+
+The app automatically downloads the MovieLens dataset if needed and loads the trained model.

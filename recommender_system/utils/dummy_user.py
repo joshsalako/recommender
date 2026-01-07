@@ -30,7 +30,7 @@ def get_dummy_user_factors(model, dummy_ratings):
 
     return dummy_user_bias, dummy_user_vector
 
-def recommend_for_dummy_user(model, train_movie,
+def recommend_for_dummy_user(model, item_rating_counts,
                              user_bias, user_vector,
                              rated_items, top_n=10, alpha=1,
                              min_item_ratings=100):
@@ -38,15 +38,33 @@ def recommend_for_dummy_user(model, train_movie,
     Generates recommendations for a dummy user:
     - excluding items already rated by that user
     - excluding items with fewer than `min_item_ratings` ratings in the dataset
+
+    Args:
+        model: ALS model instance
+        item_rating_counts: Array of rating counts for each movie (or LightweightMovieIndex)
+        user_bias: Computed user bias
+        user_vector: Computed user latent vector
+        rated_items: Set of movie indices already rated by user
+        top_n: Number of recommendations to return
+        alpha: Bias weighting parameter
+        min_item_ratings: Minimum number of ratings required for recommendation
     """
 
     scores = alpha * (model.mu + model.item_biases) + np.dot(model.item_vector, user_vector)
     rated_items = set(rated_items)
 
-    # Mask items with insufficient global ratings (< 100)
-    for item_idx in range(model.n_movies):
-        if len(train_movie[item_idx]) < min_item_ratings or item_idx in rated_items:
-            scores[item_idx] = -np.inf
+    # Mask items with insufficient global ratings (< min_item_ratings)
+    # Handle both array and LightweightMovieIndex inputs
+    if hasattr(item_rating_counts, 'get_item_rating_count'):
+        # LightweightMovieIndex object
+        for item_idx in range(model.n_movies):
+            if item_rating_counts.get_item_rating_count(item_idx) < min_item_ratings or item_idx in rated_items:
+                scores[item_idx] = -np.inf
+    else:
+        # Array of rating counts
+        for item_idx in range(model.n_movies):
+            if item_idx >= len(item_rating_counts) or item_rating_counts[item_idx] < min_item_ratings or item_idx in rated_items:
+                scores[item_idx] = -np.inf
 
     top_items = np.argpartition(scores, -top_n)[-top_n:]
     top_items = top_items[np.argsort(scores[top_items])[::-1]]

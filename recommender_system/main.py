@@ -6,7 +6,7 @@ import numpy as np
 
 from recommender_system import config
 from recommender_system.data.loader import download_and_extract_data, load_data, convert_to_numpy
-from recommender_system.data.index import MovieIndex
+from recommender_system.data.index import MovieIndex, LightweightMovieIndex
 from recommender_system.models.als import ALS
 from recommender_system.models.als_biases import ALSBiases
 from recommender_system.models.als_latent import ALSLatent
@@ -99,6 +99,7 @@ def main():
     parser.add_argument("--visualize", action="store_true", help="Run data visualizations")
     parser.add_argument("--train", action="store_true", help="Run training/grid search")
     parser.add_argument("--vectors", action="store_true", help="Visualize latent vectors (requires trained model)")
+    parser.add_argument("--inference", action="store_true", help="Generate inference files for lightweight loading")
     parser.add_argument("--model", type=str, default=config.DEFAULT_MODEL, choices=config.MODEL_CHOICES,
                         help=f"Model type to use (default: {config.DEFAULT_MODEL})")
     args = parser.parse_args()
@@ -139,6 +140,11 @@ def main():
         plots.plot_precision_recall_comparison(df_results)
         plots.plot_rmse_heatmap(df_results)
 
+        # Generate inference files if requested
+        if args.inference:
+            print("Generating inference files for lightweight loading...")
+            generate_inference_files(movie_index, movies_df, args.model)
+
     # 6. Vector Visualization (Example using a fresh model if no checkpoint provided)
     if args.vectors:
         # NOTE: In a real scenario, you'd load the best checkpoint.
@@ -156,6 +162,84 @@ def main():
         model.train(n_epochs=5, save_dir=os.path.join(config.SAVE_DIR, "vector_viz"))
 
         vectors.visualize_vectors(model, movies_df, movie_index)
+
+def generate_inference_files(movie_index, movies_df, model_type="als"):
+    """
+    Generate lightweight inference files for the Streamlit app.
+
+    Args:
+        movie_index: Full MovieIndex instance
+        movies_df: Movies dataframe
+        model_type: Type of model to load for inference
+    """
+    import os
+
+    # Create inference directory
+    inference_dir = "inference"
+    os.makedirs(inference_dir, exist_ok=True)
+
+    # 1. Save movies metadata as parquet
+    movies_path = os.path.join(inference_dir, "app_movies.parquet")
+    movies_df.write_parquet(movies_path)
+    print(f"Saved movies metadata -> {movies_path}")
+
+    # 2. Create and save lightweight index
+    lightweight_index = LightweightMovieIndex.from_full_index(movie_index)
+    index_path = os.path.join(inference_dir, "app_index.pkl")
+    counts_path = os.path.join(inference_dir, "app_item_counts.npy")
+    lightweight_index.save(index_path, counts_path)
+    print(f"Saved lightweight index -> {index_path}, {counts_path}")
+
+    # 3. Find and load the best model checkpoint
+    # Look for the most recent checkpoint in results directory
+    results_dir = config.SAVE_DIR
+    checkpoint_files = []
+
+    for file in os.listdir(results_dir):
+        if file.endswith(".pkl") and model_type in file:
+            checkpoint_files.append(os.path.join(results_dir, file))
+
+    if not checkpoint_files:
+        print(f"Warning: No {model_type} checkpoints found in {results_dir}")
+        print("Please train a model first with --train flag")
+        return
+
+    # Use the most recent checkpoint (by modification time)
+    latest_checkpoint = max(checkpoint_files, key=os.path.getmtime)
+    print(f"Loading checkpoint for inference: {latest_checkpoint}")
+
+    # Load the checkpoint and create inference model
+    # Note: We need to load the model with dummy data since load_checkpoint requires it
+    # We'll create a minimal model instance and copy parameters
+    with open(latest_checkpoint, 'rb') as f:
+        import pickle
+        checkpoint = pickle.load(f)
+
+    # Create a minimal ALS model for inference
+    model = ALS(
+        n_users=checkpoint['n_users'],
+        n_movies=checkpoint['n_movies'],
+        k=checkpoint['k'],
+        lambda_reg=checkpoint['lambda_reg'],
+        tau=checkpoint['tau'],
+        train_user=None,
+        test_user=None,
+        train_movie=None,
+        test_movie=None,
+        n_jobs=1
+    )
+
+    # Copy parameters from checkpoint
+    model.mu = checkpoint['mu']
+    model.user_biases = checkpoint['user_biases'].astype(np.float32)
+    model.item_biases = checkpoint['item_biases'].astype(np.float32)
+    model.user_vector = checkpoint['user_vector'].astype(np.float32)
+    model.item_vector = checkpoint['item_vector'].astype(np.float32)
+
+    # Save for inference
+    model.save_for_inference(inference_dir)
+    print("Inference files generated successfully!")
+    print(f"Files available in: {inference_dir}/")
 
 if __name__ == "__main__":
     main()

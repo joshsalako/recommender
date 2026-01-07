@@ -1,5 +1,6 @@
 import numpy as np
 import gc
+import pickle
 from ..utils.numba_ops import build_grouped_data, split_user_data
 
 class MovieIndex:
@@ -102,6 +103,13 @@ class MovieIndex:
         gc.collect()
         return (train_user_data, test_user_data, train_movie_data, test_movie_data)
 
+    def get_item_rating_counts(self):
+        """Get array of rating counts for each movie."""
+        counts = np.zeros(self.n_movies, dtype=np.int32)
+        for i in range(self.n_movies):
+            counts[i] = len(self.data_by_movie[i])
+        return counts
+
     def _flat_to_object_array(self, offsets, col_ids, ratings, n_groups):
         """Helper to convert flat CSR arrays back to the legacy object-array format."""
         out = np.empty(n_groups, dtype=object)
@@ -114,3 +122,64 @@ class MovieIndex:
             else:
                 out[i] = np.array([], dtype=np.float32)
         return out
+
+
+class LightweightMovieIndex:
+    """Lightweight index for inference-only use cases."""
+
+    def __init__(self, movie_to_idx=None, idx_to_movie=None, item_rating_counts=None):
+        """
+        Initialize with minimal data needed for inference.
+
+        Args:
+            movie_to_idx: Dictionary mapping movieId to internal index
+            idx_to_movie: Dictionary mapping internal index to movieId
+            item_rating_counts: Array of rating counts for each movie
+        """
+        self.movie_to_idx = movie_to_idx if movie_to_idx is not None else {}
+        self.idx_to_movie = idx_to_movie if idx_to_movie is not None else {}
+        self.item_rating_counts = item_rating_counts if item_rating_counts is not None else np.array([], dtype=np.int32)
+        self.n_movies = len(self.movie_to_idx)
+
+    @classmethod
+    def from_full_index(cls, full_index):
+        """Create lightweight index from a full MovieIndex."""
+        return cls(
+            movie_to_idx=full_index.movie_to_idx.copy(),
+            idx_to_movie=full_index.idx_to_movie.copy(),
+            item_rating_counts=full_index.get_item_rating_counts()
+        )
+
+    @classmethod
+    def load(cls, index_path, counts_path):
+        """Load lightweight index from saved files."""
+        with open(index_path, 'rb') as f:
+            index_data = pickle.load(f)
+
+        item_rating_counts = np.load(counts_path, mmap_mode='r')
+
+        return cls(
+            movie_to_idx=index_data['movie_to_idx'],
+            idx_to_movie=index_data['idx_to_movie'],
+            item_rating_counts=item_rating_counts
+        )
+
+    def save(self, index_path, counts_path):
+        """Save lightweight index to files."""
+        # Save index dictionaries
+        index_data = {
+            'movie_to_idx': self.movie_to_idx,
+            'idx_to_movie': self.idx_to_movie
+        }
+
+        with open(index_path, 'wb') as f:
+            pickle.dump(index_data, f)
+
+        # Save rating counts as numpy array
+        np.save(counts_path, self.item_rating_counts)
+
+    def get_item_rating_count(self, movie_idx):
+        """Get rating count for a specific movie index."""
+        if 0 <= movie_idx < len(self.item_rating_counts):
+            return self.item_rating_counts[movie_idx]
+        return 0

@@ -10,7 +10,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from recommender_system.models.als import ALS
 from recommender_system.utils.dummy_user import get_dummy_user_factors, recommend_for_dummy_user
 from recommender_system.data.loader import load_data, download_and_extract_data
-from recommender_system.data.index import MovieIndex
+from recommender_system.data.index import MovieIndex, LightweightMovieIndex
 from recommender_system.utils.posters import PosterFetcher
 
 # Configure page with collapsed sidebar
@@ -53,6 +53,7 @@ st.markdown("""
 def load_resources():
     """
     Loads data, model, and poster fetcher. Cached to avoid reloading.
+    Uses full dataset loading (memory intensive).
     """
     download_and_extract_data()
     ratings_df, movies_df, tags_df = load_data()
@@ -75,12 +76,69 @@ def load_resources():
 
     return model, movies_df, movie_index, train_movie, poster_fetcher
 
+@st.cache_resource
+def load_resources_light():
+    """
+    Loads data, model, and poster fetcher using lightweight pre-computed files.
+    Memory-efficient alternative to load_resources().
+    """
+    # Check if inference files exist
+    inference_dir = "inference"
+    model_path = os.path.join(inference_dir, "app_model.npz")
+    index_path = os.path.join(inference_dir, "app_index.pkl")
+    counts_path = os.path.join(inference_dir, "app_item_counts.npy")
+    movies_path = os.path.join(inference_dir, "app_movies.parquet")
+
+    if not all(os.path.exists(p) for p in [model_path, index_path, counts_path, movies_path]):
+        st.warning("Inference files not found. Please run model training with --inference flag first.")
+        return None, None, None, None, None
+
+    # Load lightweight resources
+    try:
+        # Load model for inference
+        model = ALS.load_for_inference(model_path)
+
+        # Load movies metadata
+        movies_df = pl.read_parquet(movies_path)
+
+        # Load lightweight index
+        movie_index = LightweightMovieIndex.load(index_path, counts_path)
+
+        # Initialize Poster Fetcher
+        poster_fetcher = PosterFetcher()
+
+        # train_movie is replaced with item_rating_counts in the lightweight index
+        # We pass the index itself as the item_rating_counts parameter
+        return model, movies_df, movie_index, movie_index, poster_fetcher
+
+    except Exception as e:
+        st.error(f"Error loading lightweight resources: {e}")
+        return None, None, None, None, None
+
+# Configuration option for loading method
+st.sidebar.markdown("### Memory Settings")
+use_lightweight = st.sidebar.checkbox(
+    "Use memory-efficient loading (recommended for low-memory devices)",
+    value=True,
+    help="Uses pre-computed inference files instead of loading full dataset"
+)
+
 # Load resources
 with st.spinner("Loading model and data... This may take a minute."):
-    model, movies_df, movie_index, train_movie, poster_fetcher = load_resources()
+    if use_lightweight:
+        model, movies_df, movie_index, train_movie, poster_fetcher = load_resources_light()
+    else:
+        model, movies_df, movie_index, train_movie, poster_fetcher = load_resources()
 
 if model is None:
-    st.error("Model file (model.pkl) not found. Please train the model first using 'uv run python -m recommender_system.main --train'")
+    if use_lightweight:
+        st.error("""
+        Inference files not found. Please either:
+        1. Train the model with inference file generation: `uv run python -m recommender_system.main --train --inference`
+        2. Or disable memory-efficient loading and use the full dataset
+        """)
+    else:
+        st.error("Model file (model.pkl) not found. Please train the model first using 'uv run python -m recommender_system.main --train'")
     st.stop()
 
 # Sidebar controls (Hamburger menu)
